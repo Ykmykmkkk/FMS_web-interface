@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="dark">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>FMS Dashboard</title>
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+      integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH"
+      crossorigin="anonymous"
+    />
+    <style>
+      body {
+        background-color: #212529;
+        color: #e9ecef;
+      }
+      .card {
+        background-color: #343a40;
+        border-color: #495057;
+      }
+      #mapCanvas {
+        border: 1px solid #495057;
+        background-color: #fff;
+      }
+      .form-control, .form-select {
+        background-color: #495057;
+        border-color: #6c757d;
+        color: #e9ecef;
+      }
+      .form-control:focus, .form-select:focus {
+        background-color: #495057;
+        border-color: #80bdff;
+        color: #e9ecef;
+      }
+      .table {
+        border-color: #495057;
+      }
+      .status-pending { color: #ffc107; }
+      .status-running { color: #0dcaf0; }
+      .status-done { color: #198754; }
+      .status-failed { color: #dc3545; }
+    </style>
+    <script src="/static/roslib.min.js"></script>
+  </head>
+  <body>
+    <div class="container mt-4">
+      <header class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+          <h2>FMS Web Panel</h2>
+          <p class="text-muted">ROS2 Fleet Management System Interface</p>
+        </div>
+        <div class="text-end">
+          <strong>ROS Connection Status:</strong>
+          <span id="status" class="badge bg-secondary">Connecting...</span>
+        </div>
+      </header>
+
+      <div class="row">
+        <!-- Left Column -->
+        <div class="col-lg-8">
+          <div class="card">
+            <div class="card-header">
+              <h5 class="mb-0">Map & Robot Pose</h5>
+            </div>
+            <div class="card-body">
+              <canvas id="mapCanvas" class="w-100" style="height: 500px;"></canvas>
+              <pre id="pose" class="mt-2 small text-muted"></pre>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right Column -->
+        <div class="col-lg-4">
+          <div class="card mb-4">
+            <div class="card-header">
+              <h5 class="mb-0">Teleoperation</h5>
+            </div>
+            <div class="card-body text-center">
+              <p class="text-muted small">※ Use with caution while Nav2 is active</p>
+              <div class="btn-group" role="group">
+                <button id="forwardBtn" class="btn btn-primary">Forward</button>
+                <button id="stopBtn" class="btn btn-danger">Stop</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <h5 class="mb-0">FMS Status</h5>
+            </div>
+            <div class="card-body">
+              <div id="fmsRobot" class="mb-3"></div>
+              <div class="table-responsive" style="max-height: 300px; overflow-y: auto;">
+                <table class="table table-sm">
+                  <thead>
+                    <tr>
+                      <th>ID</th>
+                      <th>Status</th>
+                      <th>Error</th>
+                    </tr>
+                  </thead>
+                  <tbody id="fmsTasks"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="row mt-4">
+          <div class="col-12">
+              <div class="card">
+                  <div class="card-header">
+                      <h5 class="mb-0">Goal Management</h5>
+                  </div>
+                  <div class="card-body">
+                      <div class="row">
+                          <div class="col-md-6">
+                              <h6>A) Add Task to FMS Queue (Recommended)</h6>
+                              <div class="input-group">
+                                  <span class="input-group-text">X</span>
+                                  <input type="number" id="taskX" class="form-control" step="0.1" value="0.0" />
+                                  <span class="input-group-text">Y</span>
+                                  <input type="number" id="taskY" class="form-control" step="0.1" value="0.0" />
+                                  <span class="input-group-text">Yaw</span>
+                                  <input type="number" id="taskYaw" class="form-control" step="0.1" value="0.0" />
+                                  <button id="sendTaskBtn" class="btn btn-outline-primary">Add Task</button>
+                              </div>
+                              <pre id="taskStatus" class="mt-2 small"></pre>
+                          </div>
+                          <div class="col-md-6">
+                              <h6>B) Send Goal Directly to Nav2 (Optional)</h6>
+                              <div class="input-group">
+                                  <span class="input-group-text">X</span>
+                                  <input type="number" id="goalX" class="form-control" step="0.1" value="0.0" />
+                                  <span class="input-group-text">Y</span>
+                                  <input type="number" id="goalY" class="form-control" step="0.1" value="0.0" />
+                                  <button id="sendGoalBtn" class="btn btn-outline-info">Go Now</button>
+                              </div>
+                              <pre id="goalStatus" class="mt-2 small"></pre>
+                          </div>
+                      </div>
+                  </div>
+              </div>
+          </div>
+      </div>
+    </div>
+
+    <script
+      src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"
+      integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz"
+      crossorigin="anonymous"
+    ></script>
+    <script>
+      // ===== 1. ROS Bridge Connection =====
+      const ros = new ROSLIB.Ros({ url: "ws://localhost:9090" });
+
+      const statusEl = document.getElementById("status");
+      const poseEl = document.getElementById("pose");
+      const goalStatusEl = document.getElementById("goalStatus");
+      const taskStatusEl = document.getElementById("taskStatus");
+
+      ros.on("connection", () => { 
+        statusEl.textContent = "Connected";
+        statusEl.className = "badge bg-success";
+      });
+      ros.on("error", (error) => {
+        statusEl.textContent = "Error";
+        statusEl.className = "badge bg-danger";
+        console.error(error);
+      });
+      ros.on("close", () => {
+        statusEl.textContent = "Closed";
+        statusEl.className = "badge bg-secondary";
+      });
+
+      // ===== 2. Canvas / Map State =====
+      const canvas = document.getElementById("mapCanvas");
+      const ctx = canvas.getContext("2d");
+
+      let mapInfo = null;
+      let mapData = null;
+      let mapImageReady = false;
+      let cachedMapImage = null;
+
+      let odomPose = null;
+      let amclPose = null;
+      let poseOffset = null;
+      let robotPose = null;
+
+      let targetRobotPixel = null;
+      let currentRobotPixel = null;
+
+      function drawMap() {
+        if (!mapInfo || !mapData) return;
+
+        const container = canvas.parentElement;
+        const containerWidth = container.clientWidth;
+        
+        const mapAspectRatio = mapInfo.width / mapInfo.height;
+        canvas.width = containerWidth;
+        canvas.height = containerWidth / mapAspectRatio;
+
+        const scaleX = canvas.width / mapInfo.width;
+        const scaleY = canvas.height / mapInfo.height;
+        const scale = Math.min(scaleX, scaleY);
+
+        const imageData = ctx.createImageData(canvas.width, canvas.height);
+        const pixels = imageData.data;
+
+        for (let y = 0; y < mapInfo.height; y++) {
+          for (let x = 0; x < mapInfo.width; x++) {
+            const idxMap = x + y * mapInfo.width;
+            const occ = mapData[idxMap];
+
+            let color;
+            if (occ < 0) color = 40;
+            else if (occ === 0) color = 255;
+            else color = 100;
+
+            const canvasX = Math.floor(x * scale);
+            const canvasY = Math.floor((mapInfo.height - 1 - y) * scale);
+
+            for (let dy = 0; dy < Math.ceil(scale); dy++) {
+              for (let dx = 0; dx < Math.ceil(scale); dx++) {
+                const px = canvasX + dx;
+                const py = canvasY + dy;
+                if (px < canvas.width && py < canvas.height) {
+                  const idx = (px + py * canvas.width) * 4;
+                  pixels[idx] = color;
+                  pixels[idx + 1] = color;
+                  pixels[idx + 2] = color;
+                  pixels[idx + 3] = 255;
+                }
+              }
+            }
+          }
+        }
+
+        ctx.putImageData(imageData, 0, 0);
+        cachedMapImage = imageData;
+        mapImageReady = true;
+      }
+      
+      function robotPoseToPixel(pose) {
+        if (!mapInfo) return null;
+
+        const scale = canvas.width / mapInfo.width;
+        const res = mapInfo.resolution;
+        const origin = mapInfo.origin;
+
+        const cellX = (pose.x - origin.position.x) / res;
+        const cellY = (pose.y - origin.position.y) / res;
+
+        const canvasX = cellX * scale;
+        const canvasY = (mapInfo.height - 1 - cellY) * scale;
+
+        return { x: canvasX, y: canvasY };
+      }
+
+      function drawRobotOnMap() {
+        if (!mapImageReady || !currentRobotPixel) return;
+        const { x, y } = currentRobotPixel;
+
+        ctx.fillStyle = "#0dcaf0";
+        ctx.beginPath();
+        ctx.arc(x, y, 6, 0, Math.PI * 2);
+        ctx.fill();
+        
+        ctx.strokeStyle = "#fff";
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+      }
+
+      // ===== 3. /map Subscription =====
+      const mapListener = new ROSLIB.Topic({
+        ros: ros,
+        name: "/map",
+        messageType: "nav_msgs/OccupancyGrid",
+      });
+
+      mapListener.subscribe((msg) => {
+        mapInfo = msg.info;
+        mapData = msg.data;
+        drawMap();
+      });
+
+      // ===== 4. /amcl_pose Subscription =====
+      const amclListener = new ROSLIB.Topic({
+        ros: ros,
+        name: "/amcl_pose",
+        messageType: "geometry_msgs/PoseWithCovarianceStamped",
+      });
+
+      amclListener.subscribe((msg) => {
+        const { x, y } = msg.pose.pose.position;
+        amclPose = { x, y };
+        if (odomPose) {
+          poseOffset = { x: amclPose.x - odomPose.x, y: amclPose.y - odomPose.y };
+        }
+      });
+
+      // ===== 5. /odom Subscription =====
+      const odomListener = new ROSLIB.Topic({
+        ros: ros,
+        name: "/odom",
+        messageType: "nav_msgs/Odometry",
+      });
+
+      odomListener.subscribe((msg) => {
+        const { x, y } = msg.pose.pose.position;
+        odomPose = { x, y };
+
+        poseEl.textContent = `Odom: (${x.toFixed(2)}, ${y.toFixed(2)})`;
+        if (amclPose) {
+            poseEl.textContent += ` | Map: (${amclPose.x.toFixed(2)}, ${amclPose.y.toFixed(2)})`;
+        }
+
+        let mapPose;
+        if (poseOffset) mapPose = { x: odomPose.x + poseOffset.x, y: odomPose.y + poseOffset.y };
+        else if (amclPose) mapPose = { ...amclPose };
+        else mapPose = { ...odomPose };
+
+        robotPose = mapPose;
+
+        const pixel = robotPoseToPixel(robotPose);
+        if (pixel) {
+          targetRobotPixel = pixel;
+          if (!currentRobotPixel) currentRobotPixel = { ...targetRobotPixel };
+        }
+      });
+
+      // ===== 6. Animation Loop =====
+      function animationLoop() {
+        if (mapImageReady && cachedMapImage) {
+          ctx.putImageData(cachedMapImage, 0, 0);
+
+          if (currentRobotPixel && targetRobotPixel) {
+            const alpha = 0.1;
+            currentRobotPixel.x += (targetRobotPixel.x - currentRobotPixel.x) * alpha;
+            currentRobotPixel.y += (targetRobotPixel.y - currentRobotPixel.y) * alpha;
+            drawRobotOnMap();
+          }
+        }
+        requestAnimationFrame(animationLoop);
+      }
+      animationLoop();
+      
+      window.addEventListener('resize', drawMap);
+
+      // ===== 7. /cmd_vel =====
+      const cmdVel = new ROSLIB.Topic({
+        ros: ros,
+        name: "/cmd_vel",
+        messageType: "geometry_msgs/Twist",
+      });
+
+      document.getElementById("forwardBtn").onclick = () => {
+        cmdVel.publish(new ROSLIB.Message({
+          linear: { x: 0.2, y: 0.0, z: 0.0 },
+          angular: { x: 0.0, y: 0.0, z: 0.0 },
+        }));
+      };
+
+      document.getElementById("stopBtn").onclick = () => {
+        cmdVel.publish(new ROSLIB.Message({
+          linear: { x: 0.0, y: 0.0, z: 0.0 },
+          angular: { x: 0.0, y: 0.0, z: 0.0 },
+        }));
+      };
+
+      // ===== 8-A. FMS Queue Task =====
+      document.getElementById("sendTaskBtn").onclick = async () => {
+        const x = parseFloat(document.getElementById("taskX").value);
+        const y = parseFloat(document.getElementById("taskY").value);
+        const yaw = parseFloat(document.getElementById("taskYaw").value);
+
+        if (Number.isNaN(x) || Number.isNaN(y) || Number.isNaN(yaw)) {
+          taskStatusEl.textContent = "Invalid x, y, or yaw.";
+          return;
+        }
+
+        taskStatusEl.textContent = "Sending task...";
+        const res = await fetch("/tasks", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ x, y, yaw }),
+        });
+
+        taskStatusEl.textContent = res.ok ? `Task added: (${x}, ${y}, ${yaw})` : "Failed to add task.";
+      };
+
+      // ===== 8-B. Direct Nav2 Goal =====
+      const navActionClient = new ROSLIB.ActionClient({
+        ros: ros,
+        serverName: "/navigate_to_pose",
+        actionName: "nav2_msgs/action/NavigateToPose",
+      });
+
+      document.getElementById("sendGoalBtn").onclick = () => {
+        const x = parseFloat(document.getElementById("goalX").value);
+        const y = parseFloat(document.getElementById("goalY").value);
+
+        if (Number.isNaN(x) || Number.isNaN(y)) {
+          goalStatusEl.textContent = "Invalid x or y.";
+          return;
+        }
+
+        const goal = new ROSLIB.Goal({
+          actionClient: navActionClient,
+          goalMessage: {
+            pose: {
+              header: { frame_id: "map" },
+              pose: {
+                position: { x: x, y: y, z: 0.0 },
+                orientation: { x: 0.0, y: 0.0, z: 0.0, w: 1.0 },
+              },
+            },
+          },
+        });
+
+        goalStatusEl.textContent = `Sending goal: (${x}, ${y})`;
+        goal.on("feedback", (_) => goalStatusEl.textContent = "Moving...");
+        goal.on("result", (res) => goalStatusEl.textContent = "Goal reached.");
+        goal.send();
+      };
+
+      // ===== 9. FMS Status Polling =====
+      async function refreshFMS() {
+        const r = await fetch("/state");
+        const s = await r.json();
+
+        const el = document.getElementById("fmsRobot");
+        let robotStatusHtml = `<strong>Robot:</strong> <span class="status-${s.robot.status.toLowerCase()}">${s.robot.status}</span>`;
+        if(s.robot.current_task_id) {
+          robotStatusHtml += ` | <strong>Task:</strong> ${s.robot.current_task_id}`;
+        }
+        if (s.robot.last_error) {
+          robotStatusHtml += ` <span class="text-danger">| <strong>Error:</strong> ${s.robot.last_error}</span>`;
+        }
+        el.innerHTML = robotStatusHtml;
+
+        const tb = document.getElementById("fmsTasks");
+        tb.innerHTML = "";
+        s.tasks.slice().reverse().forEach(t => {
+          const tr = document.createElement("tr");
+          tr.innerHTML = `<td>${t.task_id}</td><td class="status-${t.status.toLowerCase()}">${t.status}</td><td>${t.error ?? ""}</td>`;
+          tb.appendChild(tr);
+        });
+      }
+      setInterval(refreshFMS, 1000);
+      refreshFMS();
+    </script>
+  </body>
+</html>
