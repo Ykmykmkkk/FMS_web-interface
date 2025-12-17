@@ -1,0 +1,37 @@
+running egg_info
+creating ../../build/fms_server/fms_server.egg-info
+writing ../../build/fms_server/fms_server.egg-info/PKG-INFO
+writing dependency_links to ../../build/fms_server/fms_server.egg-info/dependency_links.txt
+writing entry points to ../../build/fms_server/fms_server.egg-info/entry_points.txt
+writing requirements to ../../build/fms_server/fms_server.egg-info/requires.txt
+writing top-level names to ../../build/fms_server/fms_server.egg-info/top_level.txt
+writing manifest file '../../build/fms_server/fms_server.egg-info/SOURCES.txt'
+reading manifest file '../../build/fms_server/fms_server.egg-info/SOURCES.txt'
+writing manifest file '../../build/fms_server/fms_server.egg-info/SOURCES.txt'
+running build
+running build_py
+creating /home/kyeongmin/ros2_ws/build/fms_server/build
+creating /home/kyeongmin/ros2_ws/build/fms_server/build/lib
+creating /home/kyeongmin/ros2_ws/build/fms_server/build/lib/fms_server
+copying fms_server/__init__.py -> /home/kyeongmin/ros2_ws/build/fms_server/build/lib/fms_server
+copying fms_server/fms_app.py -> /home/kyeongmin/ros2_ws/build/fms_server/build/lib/fms_server
+running install
+running install_lib
+creating /home/kyeongmin/ros2_ws/install/fms_server/lib/python3.10/site-packages/fms_server
+copying /home/kyeongmin/ros2_ws/build/fms_server/build/lib/fms_server/__init__.py -> /home/kyeongmin/ros2_ws/install/fms_server/lib/python3.10/site-packages/fms_server
+copying /home/kyeongmin/ros2_ws/build/fms_server/build/lib/fms_server/fms_app.py -> /home/kyeongmin/ros2_ws/install/fms_server/lib/python3.10/site-packages/fms_server
+byte-compiling /home/kyeongmin/ros2_ws/install/fms_server/lib/python3.10/site-packages/fms_server/__init__.py to __init__.cpython-310.pyc
+byte-compiling /home/kyeongmin/ros2_ws/install/fms_server/lib/python3.10/site-packages/fms_server/fms_app.py to fms_app.cpython-310.pyc
+running install_data
+creating /home/kyeongmin/ros2_ws/install/fms_server/share/ament_index
+creating /home/kyeongmin/ros2_ws/install/fms_server/share/ament_index/resource_index
+creating /home/kyeongmin/ros2_ws/install/fms_server/share/ament_index/resource_index/packages
+copying resource/fms_server -> /home/kyeongmin/ros2_ws/install/fms_server/share/ament_index/resource_index/packages
+copying package.xml -> /home/kyeongmin/ros2_ws/install/fms_server/share/fms_server
+creating /home/kyeongmin/ros2_ws/install/fms_server/share/fms_server/static
+copying fms_server/static/roslib.min.js -> /home/kyeongmin/ros2_ws/install/fms_server/share/fms_server/static
+running install_egg_info
+Copying ../../build/fms_server/fms_server.egg-info to /home/kyeongmin/ros2_ws/install/fms_server/lib/python3.10/site-packages/fms_server-0.0.0-py3.10.egg-info
+running install_scripts
+Installing fms_app script to /home/kyeongmin/ros2_ws/install/fms_server/lib/fms_server
+writing list of installed files to '/home/kyeongmin/ros2_ws/build/fms_server/install.log'

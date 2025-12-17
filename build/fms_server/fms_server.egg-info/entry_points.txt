@@ -1,0 +1,3 @@
+[console_scripts]
+fms_app = fms_server.fms_app:main
+
